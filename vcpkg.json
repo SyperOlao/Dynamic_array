@@ -1,0 +1,7 @@
+{
+  "name": "dynamic-array",
+  "version-string": "0.1.0",
+  "dependencies": [
+    "cppunit"
+  ]
+}
