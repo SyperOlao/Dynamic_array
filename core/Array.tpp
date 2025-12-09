@@ -50,12 +50,13 @@ void Array<T>::grow_if_needed_for_insert() {
     capacity_ = new_capacity;
 }
 
+
 template<typename T>
 T *Array<T>::allocate_new_data(const int capacity) {
     if (capacity <= 0) return nullptr;
-    void* raw = std::malloc(static_cast<size_t>(capacity) * sizeof(T));
+    void *raw = std::malloc(static_cast<size_t>(capacity) * sizeof(T));
     if (!raw) throw std::bad_alloc();
-    return static_cast<T*>(raw);
+    return static_cast<T *>(raw);
 }
 
 template<typename T>
@@ -115,7 +116,7 @@ int Array<T>::insert(const T &value) {
 }
 
 template<typename T>
-int Array<T>::insert(T&& value) {
+int Array<T>::insert(T &&value) {
     grow_if_needed_for_insert();
     std::construct_at(data_ + size_, std::move(value));
     return size_++;
@@ -129,17 +130,15 @@ int Array<T>::insert(int index, const T &value) {
     try {
         if (index < size_) {
             std::construct_at(data_ + size_,
-                            std::move_if_noexcept(data_[size_ - 1]));
+                              std::move_if_noexcept(data_[size_ - 1]));
             for (int i = size_ - 1; i > index; --i) {
                 data_[i] = std::move_if_noexcept(data_[i - 1]);
             }
             data_[index] = value;
-        }
-        else {
+        } else {
             std::construct_at(data_ + size_, value);
         }
-
-    }catch (...) {
+    } catch (...) {
         if (index < size_) {
             std::destroy_at(data_ + size_);
         }
@@ -181,4 +180,66 @@ T &Array<T>::operator[](int index) {
 template<typename T>
 int Array<T>::size() const {
     return size_;
+}
+
+template<typename T>
+Array<T>::Array(const Array<T> &other)
+    : data_(nullptr), size_(other.size_), capacity_(other.capacity_) {
+    if (capacity_ > 0) {
+        data_ = allocate_new_data(capacity_);
+        int i = 0;
+        try {
+            for (; i < size_; ++i) {
+                std::construct_at(data_ + i, other.data_[i]);
+            }
+        } catch (...) {
+            while (i-- > 0) {
+                std::destroy_at(data_ + i);
+            }
+            std::free(data_);
+            data_ = nullptr;
+            size_ = 0;
+            capacity_ = 0;
+            throw;
+        }
+    }
+}
+
+template<typename T>
+Array<T>::Array(Array<T> &&other) noexcept
+    : data_(other.data_), size_(other.size_), capacity_(other.capacity_) {
+    other.data_ = nullptr;
+    other.size_ = 0;
+    other.capacity_ = 0;
+}
+
+template<typename T>
+Array<T> &Array<T>::operator=(const Array<T> &other) {
+    if (this == &other) return *this;
+
+    Array<T> tmp(other);
+    using std::swap;
+    swap(data_, tmp.data_);
+    swap(size_, tmp.size_);
+    swap(capacity_, tmp.capacity_);
+    return *this;
+}
+
+template<typename T>
+Array<T> &Array<T>::operator=(Array<T> &&other) noexcept {
+    if (this == &other) return *this;
+
+    for (int i = 0; i < size_; ++i) {
+        std::destroy_at(data_ + i);
+    }
+    std::free(data_);
+
+    data_ = other.data_;
+    size_ = other.size_;
+    capacity_ = other.capacity_;
+
+    other.data_ = nullptr;
+    other.size_ = 0;
+    other.capacity_ = 0;
+    return *this;
 }

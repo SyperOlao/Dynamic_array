@@ -58,12 +58,19 @@ class Array final {
         int end_ = 0;
         friend class Array;
 
-        ConstIterator(const Array* owner, const int start, const int step, const int end)
-          : owner_(owner), idx_(start), step_(step), end_(end) {}
+        ConstIterator(const Array *owner, const int start, const int step, const int end)
+            : owner_(owner), idx_(start), step_(step), end_(end) {
+        }
     };
 
 public:
     Array();
+
+    Array(const Array& other);
+    Array(Array<T>&& other) noexcept;
+
+    Array<T>& operator=(const Array<T>& other);
+    Array<T>& operator=(Array<T>&& other) noexcept;
 
     explicit Array(int capacity);
 
@@ -71,7 +78,7 @@ public:
 
     int insert(const T &value);
 
-    int insert(T&& value);
+    int insert(T &&value);
 
     int insert(int index, const T &value);
 
