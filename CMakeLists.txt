@@ -13,24 +13,15 @@ target_link_libraries(dynamic_array_example PRIVATE array)
 
 include(CTest)
 if (BUILD_TESTING)
-    find_package(CppUnit CONFIG REQUIRED)
+    find_package(GTest CONFIG REQUIRED)
 
     add_executable(array_tests tests/ArrayTests.cpp)
-    target_link_libraries(array_tests PRIVATE array)
-
-    # Универсально определяем, какой таргет экспорта дал пакет
-    if (TARGET CppUnit::CppUnit)
-        set(_CPPUNIT_TARGET CppUnit::CppUnit)
-    elseif (TARGET CppUnit)
-        set(_CPPUNIT_TARGET CppUnit)
-    else()
-        message(FATAL_ERROR
-                "CppUnit imported target not found. Known options: CppUnit::CppUnit or CppUnit. "
-                "CppUnit_DIR='${CppUnit_DIR}'")
-    endif()
-
-    target_link_libraries(array_tests PRIVATE ${_CPPUNIT_TARGET})
+    target_link_libraries(array_tests
+            PRIVATE
+            array
+            GTest::gtest
+            GTest::gtest_main
+    )
 
     add_test(NAME ArrayTests COMMAND array_tests)
 endif()
-
