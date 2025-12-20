@@ -6,7 +6,7 @@
 #define DYNAMICARRAY_CONSTS_H
 
 namespace AppConsts{
-    static constexpr int kMinCapacity = 8;
+    static constexpr int kMinCapacity = 16;
 }
 
 #endif //DYNAMICARRAY_CONSTS_H

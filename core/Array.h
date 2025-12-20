@@ -94,6 +94,23 @@ public:
     ConstIterator iterator() const { return ConstIterator(this, 0, +1, size_); }
 
     Iterator reverseIterator() { return Iterator(this, size_ - 1, -1, -1); }
+
+    T* begin() {
+        assert((size_ == 0 || data_ != nullptr) && "Array invariant violated");
+        return data_;
+    }
+    T* end() {
+        assert((size_ == 0 || data_ != nullptr) && "Array invariant violated");
+        return data_ + size_;
+    }
+    const T* begin() const {
+        assert((size_ == 0 || data_ != nullptr) && "Array invariant violated");
+        return data_;
+    }
+    const T* end() const {
+        assert((size_ == 0 || data_ != nullptr) && "Array invariant violated");
+        return data_ + size_;
+    }
 };
 
 #include "Array.tpp"

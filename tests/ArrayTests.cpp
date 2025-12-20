@@ -4,7 +4,77 @@
 
 #include <gtest/gtest.h>
 #include "../core/Array.h"
+#include <string>
 
+TEST(ArrayStringTest, PushBackAndIndex) {
+    Array<std::string> a;
+
+    a.insert("one");
+    a.insert("two");
+    a.insert("three");
+
+    EXPECT_EQ(3, a.size());
+    EXPECT_EQ("one", a[0]);
+    EXPECT_EQ("two", a[1]);
+    EXPECT_EQ("three", a[2]);
+}
+
+TEST(ArrayStringTest, InsertInMiddleShiftsCorrectly) {
+    Array<std::string> a;
+    a.insert("a");
+    a.insert("b");
+    a.insert("d");
+
+    int idx = a.insert(2, std::string("c"));
+
+    EXPECT_EQ(2, idx);
+    EXPECT_EQ(4, a.size());
+    EXPECT_EQ("a", a[0]);
+    EXPECT_EQ("b", a[1]);
+    EXPECT_EQ("c", a[2]);
+    EXPECT_EQ("d", a[3]);
+}
+
+TEST(ArrayStringTest, RemoveDestroysAndShifts) {
+    Array<std::string> a;
+    a.insert("first");
+    a.insert("middle");
+    a.insert("last");
+
+    a.remove(1);
+
+    EXPECT_EQ(2, a.size());
+    EXPECT_EQ("first", a[0]);
+    EXPECT_EQ("last", a[1]);
+}
+
+TEST(ArrayStringTest, ReallocationKeepsStringsValid) {
+    Array<std::string> a;
+
+    for (int i = 0; i < 50; ++i) {
+        a.insert("str_" + std::to_string(i));
+    }
+
+    EXPECT_EQ(50, a.size());
+    for (int i = 0; i < 50; ++i) {
+        EXPECT_EQ("str_" + std::to_string(i), a[i]);
+    }
+}
+
+TEST(ArrayStringTest, CopyConstructorCopiesStringsDeeply) {
+    Array<std::string> a;
+    a.insert("hello");
+    a.insert("world");
+
+    Array<std::string> b = a;
+
+    EXPECT_EQ(2, b.size());
+    EXPECT_EQ("hello", b[0]);
+    EXPECT_EQ("world", b[1]);
+
+    a[0] = "changed";
+    EXPECT_EQ("hello", b[0]);
+}
 struct Tracked {
     static inline int alive = 0;
     int v{};
