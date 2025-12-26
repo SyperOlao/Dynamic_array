@@ -4,7 +4,13 @@
 #pragma once
 
 #include <cassert>
+#include <type_traits>
 
+constexpr std::conditional_t<!std::is_nothrow_move_constructible_v<T> && std::is_copy_constructible_v<T>, const T&, T&&> //
+move_if_noexcept(T& t) noexcept
+{
+    return std::move(t);
+}
 
 template<typename T>
 Array<T>::Array() : data_(nullptr) {
@@ -40,22 +46,18 @@ void Array<T>::grow_if_needed_for_insert() {
     int i = 0;
     try {
         for (; i < size_; ++i) {
-            if constexpr (std::is_nothrow_move_constructible_v<T> || !std::is_copy_constructible_v<T>) {
-                ::new (static_cast<void*>(new_data + i)) T(std::move_if_noexcept(data_[i]));
-            } else {
-                ::new (static_cast<void*>(new_data + i)) T(data_[i]);
-            }
+            ::new (static_cast<void*>(new_data + i)) T(move_if_noexcept(data_[i]));
         }
     } catch (...) {
         while (i-- > 0) {
-            std::destroy_at(new_data + i);
+            (new_data[i].~T();
         }
         std::free(new_data);
         throw;
     }
 
     for (int j = 0; j < size_; ++j) {
-        std::destroy_at(data_ + j);
+        data_[j].~T();
     }
     std::free(data_);
 
@@ -109,7 +111,7 @@ bool Array<T>::ConstIterator::hasNext() const {
 template<typename T>
 Array<T>::~Array() {
     for (int i = 0; i < size_; ++i) {
-        std::destroy_at(data_ + i);
+        data_[i].~T();
     }
     std::free(data_);
 }
@@ -136,14 +138,14 @@ int Array<T>::insert(int index, const T &value) {
     int i = size_;
     try {
         for (; i > index; --i) {
-            ::new (static_cast<void*>(data_ + i)) T(std::move_if_noexcept(data_[i - 1]));
-            std::destroy_at(data_ + (i - 1));
+            ::new (static_cast<void*>(data_ + i)) T(move_if_noexcept(data_[i - 1]));
+            data_[i - 1].~T();
         }
         ::new (static_cast<void*>(data_ + index)) T(value);
     }
     catch (...) {
         for (int j = i; j < size_; ++j) {
-            std::destroy_at(data_ + j);
+             data_[j].~T();
         }
         throw;
     }
@@ -159,17 +161,13 @@ void Array<T>::remove(int index) {
 
     const int last = size_ - 1;
 
-    std::destroy_at(data_ + index);
+    data_[index].~T();
 
     int i = index;
     try {
         for (; i < last; ++i) {
-            if constexpr (std::is_nothrow_move_constructible_v<T> || !std::is_copy_constructible_v<T>) {
-                ::new (static_cast<void*>(data_ + i)) T(std::move_if_noexcept(data_[i + 1]));
-            } else {
-                ::new (static_cast<void*>(data_ + i)) T(data_[i + 1]);
-            }
-            std::destroy_at(data_ + (i + 1));
+            ::new (static_cast<void*>(data_ + i)) T(move_if_noexcept(data_[i + 1]));
+            data_[i + 1].~T();
         }
     } catch (...) {
         throw;
@@ -214,7 +212,7 @@ Array<T>::Array(const Array<T> &other)
         }
     } catch (...) {
         while (i-- > 0) {
-            std::destroy_at(data_ + i);
+            data_[i].~T();
         }
         std::free(data_);
         data_ = nullptr;
@@ -249,7 +247,7 @@ Array<T> &Array<T>::operator=(Array<T> &&other) noexcept {
     if (this == &other) return *this;
 
     for (int i = 0; i < size_; ++i) {
-        std::destroy_at(data_ + i);
+        data_[i].~T();
     }
     std::free(data_);
 
