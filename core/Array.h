@@ -64,6 +64,9 @@ class Array final {
     };
 
 public:
+
+    [[nodiscard]] int capacity() const { return capacity_; }
+
     Array();
 
     Array(const Array& other);

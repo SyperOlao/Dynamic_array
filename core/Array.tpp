@@ -4,7 +4,13 @@
 #pragma once
 
 #include <cassert>
+#include <type_traits>
 
+constexpr std::conditional_t<!std::is_nothrow_move_constructible_v<T> && std::is_copy_constructible_v<T>, const T&, T&&> //
+move_if_noexcept(T& t) noexcept
+{
+    return std::move(t);
+}
 
 template<typename T>
 Array<T>::Array() : data_(nullptr) {
@@ -17,32 +23,41 @@ template<typename T>
     if (capacity_ > 0) {
         data_ = allocate_new_data(capacity_);
     } else {
-        data_ = allocate_new_data(AppConsts::kMinCapacity);
+        capacity_ = AppConsts::kMinCapacity;
+        data_ = allocate_new_data(capacity_);
     }
+}
+
+template<typename T>
+T* Array<T>::allocate_new_data(const int capacity) {
+    if (capacity <= 0) return nullptr;
+    void* raw = std::malloc(static_cast<size_t>(capacity) * sizeof(T));
+    if (!raw) throw std::bad_alloc();
+    return static_cast<T*>(raw);
 }
 
 template<typename T>
 void Array<T>::grow_if_needed_for_insert() {
     if (size_ < capacity_) return;
+
     const int new_capacity = capacity_ > 0 ? 2 * capacity_ : AppConsts::kMinCapacity;
-    T *new_data = allocate_new_data(new_capacity);
+    T* new_data = allocate_new_data(new_capacity);
+
     int i = 0;
     try {
-        for (; i < size_; i++) {
-            if constexpr (std::is_nothrow_move_constructible_v<T> || !std::is_copy_constructible_v<T>) {
-                std::construct_at(new_data + i, std::move_if_noexcept(data_[i]));
-            } else {
-                std::construct_at(new_data + i, data_[i]);
-            }
+        for (; i < size_; ++i) {
+            ::new (static_cast<void*>(new_data + i)) T(move_if_noexcept(data_[i]));
         }
     } catch (...) {
-        while (i-- > 0) std::destroy_at(new_data + i);
+        while (i-- > 0) {
+            (new_data[i].~T();
+        }
         std::free(new_data);
         throw;
     }
 
     for (int j = 0; j < size_; ++j) {
-        std::destroy_at(data_ + j);
+        data_[j].~T();
     }
     std::free(data_);
 
@@ -51,13 +66,6 @@ void Array<T>::grow_if_needed_for_insert() {
 }
 
 
-template<typename T>
-T *Array<T>::allocate_new_data(const int capacity) {
-    if (capacity <= 0) return nullptr;
-    void *raw = std::malloc(static_cast<size_t>(capacity) * sizeof(T));
-    if (!raw) throw std::bad_alloc();
-    return static_cast<T *>(raw);
-}
 
 template<typename T>
 const T &Array<T>::Iterator::get() const {
@@ -103,7 +111,7 @@ bool Array<T>::ConstIterator::hasNext() const {
 template<typename T>
 Array<T>::~Array() {
     for (int i = 0; i < size_; ++i) {
-        std::destroy_at(data_ + i);
+        data_[i].~T();
     }
     std::free(data_);
 }
@@ -111,36 +119,33 @@ Array<T>::~Array() {
 template<typename T>
 int Array<T>::insert(const T &value) {
     grow_if_needed_for_insert();
-    std::construct_at(data_ + size_, value);
+    ::new (static_cast<void*>(data_ + size_)) T(value);
     return size_++;
 }
 
 template<typename T>
 int Array<T>::insert(T &&value) {
     grow_if_needed_for_insert();
-    std::construct_at(data_ + size_, std::move(value));
+    ::new (static_cast<void*>(data_ + size_)) T(std::move(value));
     return size_++;
 }
-
+// размещающий new
 template<typename T>
 int Array<T>::insert(int index, const T &value) {
     assert(index >= 0 && index <= size_ && "insert index out of range");
     grow_if_needed_for_insert();
 
+    int i = size_;
     try {
-        if (index < size_) {
-            std::construct_at(data_ + size_,
-                              std::move_if_noexcept(data_[size_ - 1]));
-            for (int i = size_ - 1; i > index; --i) {
-                data_[i] = std::move_if_noexcept(data_[i - 1]);
-            }
-            data_[index] = value;
-        } else {
-            std::construct_at(data_ + size_, value);
+        for (; i > index; --i) {
+            ::new (static_cast<void*>(data_ + i)) T(move_if_noexcept(data_[i - 1]));
+            data_[i - 1].~T();
         }
-    } catch (...) {
-        if (index < size_) {
-            std::destroy_at(data_ + size_);
+        ::new (static_cast<void*>(data_ + index)) T(value);
+    }
+    catch (...) {
+        for (int j = i; j < size_; ++j) {
+             data_[j].~T();
         }
         throw;
     }
@@ -153,15 +158,21 @@ template<typename T>
 void Array<T>::remove(int index) {
     assert(index >= 0 && index < size_ && "remove: index out of range");
     if (size_ == 0) return;
+
     const int last = size_ - 1;
-    for (int i = index; i < last; ++i) {
-        if constexpr (std::is_nothrow_move_assignable_v<T> || !std::is_copy_assignable_v<T>) {
-            data_[i] = std::move_if_noexcept(data_[i + 1]);
-        } else {
-            data_[i] = data_[i + 1];
+
+    data_[index].~T();
+
+    int i = index;
+    try {
+        for (; i < last; ++i) {
+            ::new (static_cast<void*>(data_ + i)) T(move_if_noexcept(data_[i + 1]));
+            data_[i + 1].~T();
         }
+    } catch (...) {
+        throw;
     }
-    std::destroy_at(data_ + last);
+
     --size_;
 }
 
@@ -185,23 +196,29 @@ int Array<T>::size() const {
 template<typename T>
 Array<T>::Array(const Array<T> &other)
     : data_(nullptr), size_(other.size_), capacity_(other.capacity_) {
-    if (capacity_ > 0) {
-        data_ = allocate_new_data(capacity_);
-        int i = 0;
-        try {
-            for (; i < size_; ++i) {
-                std::construct_at(data_ + i, other.data_[i]);
-            }
-        } catch (...) {
-            while (i-- > 0) {
-                std::destroy_at(data_ + i);
-            }
-            std::free(data_);
-            data_ = nullptr;
-            size_ = 0;
-            capacity_ = 0;
-            throw;
+    if (capacity_ <= 0) {
+        data_ = nullptr;
+        size_ = 0;
+        capacity_ = 0;
+        return;
+    }
+
+    data_ = allocate_new_data(capacity_);
+
+    int i = 0;
+    try {
+        for (; i < size_; ++i) {
+            ::new (static_cast<void*>(data_ + i)) T(other.data_[i]);
         }
+    } catch (...) {
+        while (i-- > 0) {
+            data_[i].~T();
+        }
+        std::free(data_);
+        data_ = nullptr;
+        size_ = 0;
+        capacity_ = 0;
+        throw;
     }
 }
 
@@ -230,7 +247,7 @@ Array<T> &Array<T>::operator=(Array<T> &&other) noexcept {
     if (this == &other) return *this;
 
     for (int i = 0; i < size_; ++i) {
-        std::destroy_at(data_ + i);
+        data_[i].~T();
     }
     std::free(data_);
 

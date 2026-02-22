@@ -2,9 +2,15 @@
 
 #include "core/Array.h"
 
+static int log2i(int x) {
+    int p = 0;
+    while (x > 1) { x >>= 1; ++p; }
+    return p;
+}
+
 // TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 int main() {
-    // TIP Press <shortcut actionId="RenameElement"/> when your caret is at the <b>lang</b> variable name to see how CLion can help you rename it.
+
     Array<int> a;
     for (int i = 0; i < 10; ++i)
         a.insert(i + 1);
@@ -16,5 +22,25 @@ int main() {
         std::cout << it.get() << std::endl;
     }
 
+    Array<int> a1;
+
+    int prevCap = a1.capacity();
+
+
+    std::cout << "n | size | capacity | log2(cap) graph\n";
+    std::cout << "-------------------------------------\n";
+
+    for (int i = 0; i <= 2000; ++i) {
+        if (i > 0) a1.insert(i);
+
+        int cap = a1.capacity();
+        if (i == 0 || cap != prevCap) {
+            int bars = log2i(cap);
+            std::cout << i << " | " << a1.size() << " | " << cap << " | ";
+            for (int j = 0; j < bars; ++j) std::cout << "#";
+            std::cout << "  <-- realloc\n";
+            prevCap = cap;
+        }
+    }
     return 0;
 }
